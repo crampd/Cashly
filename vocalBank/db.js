@@ -1,42 +1,35 @@
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-import path from "path";
-import { fileURLToPath } from "url";
+import pkg from "pg";
+const { Pool } = pkg;
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, "data.db");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+});
 
-let db;
-
-export async function getDb() {
-  if (!db) {
-    db = await open({
-      filename: dbPath,
-      driver: sqlite3.Database,
-    });
-    // Create tables if not exist
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS calls (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        number TEXT,
-        name TEXT,
-        prompt TEXT,
-        first_message TEXT,
-        call_sid TEXT,
-        status TEXT,
-        dynamic_variables TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await db.exec(`
-      CREATE TABLE IF NOT EXISTS conversations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        number TEXT,
-        topics TEXT,
-        last_call_sid TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-  }
-  return db;
+// Initialize tables if they don't exist
+export async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS calls (
+      id SERIAL PRIMARY KEY,
+      number TEXT,
+      name TEXT,
+      prompt TEXT,
+      first_message TEXT,
+      call_sid TEXT,
+      status TEXT,
+      dynamic_variables TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id SERIAL PRIMARY KEY,
+      number TEXT,
+      topics TEXT,
+      last_call_sid TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 }
+
+export { pool };

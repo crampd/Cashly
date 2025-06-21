@@ -5,6 +5,7 @@ import fastifyWs from "@fastify/websocket";
 import Twilio from "twilio";
 import fetch from "node-fetch";
 import { saveCall, updateCallStatus, saveConversation, getPreviousTopics } from "./status.js";
+import { initDb } from "./db.js";
 
 dotenv.config();
 
@@ -27,6 +28,8 @@ if (
   console.error("Missing required environment variables");
   throw new Error("Missing required environment variables");
 }
+
+await initDb();
 
 const fastify = Fastify();
 fastify.register(fastifyFormBody);
