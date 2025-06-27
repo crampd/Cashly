@@ -23,6 +23,22 @@ const questions = [
   {
     key: 'ADMINS',
     question: 'Enter admin Telegram user IDs (comma-separated): '
+  },
+  {
+    key: 'PAYPAL_CLIENT_ID',
+    question: 'Enter your PayPal Client ID: '
+  },
+  {
+    key: 'PAYPAL_CLIENT_SECRET',
+    question: 'Enter your PayPal Client Secret: '
+  },
+  {
+    key: 'PAYPAL_ENV',
+    question: 'Enter PayPal environment (sandbox/live): '
+  },
+  {
+    key: 'API_URL',
+    question: 'Enter your API URL (optional): '
   }
 ];
 

@@ -1,9 +1,17 @@
 const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('./db/cashly.db');
-const config = require('../config'); // <-- Add this line
+const config = require('../config');
 
 // Initialize tables
 db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      telegram_id TEXT PRIMARY KEY,
+      name TEXT,
+      role TEXT DEFAULT 'user'
+    )
+  `);
+
   db.run(`
     CREATE TABLE IF NOT EXISTS customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -12,7 +20,9 @@ db.serialize(() => {
       email TEXT UNIQUE,
       phone TEXT,
       address TEXT,
-      stripe_customer_id TEXT
+      stripe_customer_id TEXT,
+      paypal_customer_id TEXT,
+      square_customer_id TEXT
     )
   `);
 
@@ -29,6 +39,8 @@ db.serialize(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_email TEXT,
       stripe_invoice_id TEXT,
+      paypal_invoice_id TEXT,
+      square_invoice_id TEXT,
       amount REAL,
       currency TEXT,
       description TEXT,
@@ -38,43 +50,87 @@ db.serialize(() => {
   `);
 });
 
-// Admins
-function getAdmins() {
+// --- User Management ---
+function addUser(telegram_id, name, role = 'user') {
   return new Promise((resolve, reject) => {
-    db.all('SELECT telegram_id FROM admins', [], (err, rows) => {
+    db.run(
+      'INSERT OR IGNORE INTO users (telegram_id, name, role) VALUES (?, ?, ?)',
+      [telegram_id, name, role],
+      function (err) {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function getUser(telegram_id) {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM users WHERE telegram_id = ?', [telegram_id], (err, row) => {
       if (err) reject(err);
-      else resolve(rows.map(r => r.telegram_id));
+      else resolve(row);
     });
   });
 }
 
-function addAdmin(id, role = 'admin') {
+function setUserRole(telegram_id, role) {
   return new Promise((resolve, reject) => {
-    db.run('INSERT OR IGNORE INTO admins (telegram_id, role) VALUES (?, ?)', [id, role], function (err) {
+    db.run('UPDATE users SET role = ? WHERE telegram_id = ?', [role, telegram_id], function (err) {
       if (err) reject(err);
       else resolve();
     });
   });
+}
+
+function getAllUsers() {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM users', [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+// --- Admins (compatibility, but now use users table) ---
+function getAdmins() {
+  // Combine .env ADMINS and DB admins
+  const envAdmins = config.ADMINS
+    ? String(config.ADMINS).split(',').map(x => x.trim())
+    : [];
+  return new Promise((resolve, reject) => {
+    db.all('SELECT telegram_id FROM users WHERE role = "admin"', [], (err, rows) => {
+      if (err) reject(err);
+      else {
+        const dbAdmins = rows.map(r => r.telegram_id);
+        const allAdmins = Array.from(new Set([...envAdmins, ...dbAdmins]));
+        resolve(allAdmins);
+      }
+    });
+  });
+}
+
+function addAdmin(id) {
+  return setUserRole(id, 'admin');
 }
 
 function removeAdmin(id) {
-  return new Promise((resolve, reject) => {
-    db.run('DELETE FROM admins WHERE telegram_id = ?', [id], function (err) {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+  return setUserRole(id, 'user');
 }
 
-// UPDATED: Check .env ADMINS first, then DB
+// Role check: check .env ADMINS first, then users table
 function getAdminRole(telegram_id) {
-  // Check .env ADMINS
-  if (config.ADMINS && config.ADMINS.includes(String(telegram_id))) {
-    return Promise.resolve('admin');
+  // Check .env ADMINS first
+  if (config.ADMINS) {
+    const envAdmins = Array.isArray(config.ADMINS)
+      ? config.ADMINS
+      : String(config.ADMINS).split(',').map(x => x.trim());
+    if (envAdmins.includes(String(telegram_id))) {
+      return Promise.resolve('admin');
+    }
   }
-  // Fallback to DB
+  // Then check users table
   return new Promise((resolve, reject) => {
-    db.get('SELECT role FROM admins WHERE telegram_id = ?', [telegram_id], (err, row) => {
+    db.get('SELECT role FROM users WHERE telegram_id = ?', [telegram_id], (err, row) => {
       if (err) reject(err);
       else resolve(row ? row.role : null);
     });
@@ -82,12 +138,7 @@ function getAdminRole(telegram_id) {
 }
 
 function setAdminRole(telegram_id, role) {
-  return new Promise((resolve, reject) => {
-    db.run('UPDATE admins SET role = ? WHERE telegram_id = ?', [role, telegram_id], function (err) {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+  return setUserRole(telegram_id, role);
 }
 
 // Customers
@@ -127,11 +178,13 @@ function getCustomerByStripeId(stripe_customer_id) {
   });
 }
 
-function saveCustomer({ telegram_id, name, email, phone, address, stripe_customer_id }) {
+function saveCustomer({ telegram_id, name, email, phone, address, stripe_customer_id, paypal_customer_id, square_customer_id }) {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT OR IGNORE INTO customers (telegram_id, name, email, phone, address, stripe_customer_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [telegram_id, name, email, phone, address, stripe_customer_id],
+      `INSERT OR IGNORE INTO customers 
+        (telegram_id, name, email, phone, address, stripe_customer_id, paypal_customer_id, square_customer_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [telegram_id, name, email, phone, address, stripe_customer_id, paypal_customer_id, square_customer_id],
       function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
@@ -140,11 +193,11 @@ function saveCustomer({ telegram_id, name, email, phone, address, stripe_custome
   });
 }
 
-function updateCustomer({ email, name, phone, address }) {
+function updateCustomer({ email, name, phone, address, stripe_customer_id, paypal_customer_id, square_customer_id }) {
   return new Promise((resolve, reject) => {
     db.run(
-      'UPDATE customers SET name = ?, phone = ?, address = ? WHERE email = ?',
-      [name, phone, address, email],
+      `UPDATE customers SET name = ?, phone = ?, address = ?, stripe_customer_id = ?, paypal_customer_id = ?, square_customer_id = ? WHERE email = ?`,
+      [name, phone, address, stripe_customer_id, paypal_customer_id, square_customer_id, email],
       function (err) {
         if (err) reject(err);
         else resolve(this.changes);
@@ -162,6 +215,10 @@ function deleteCustomerByEmail(email) {
   });
 }
 
+function deleteCustomer(email) {
+  return deleteCustomerByEmail(email);
+}
+
 function searchCustomers(query) {
   return new Promise((resolve, reject) => {
     db.all(
@@ -176,11 +233,11 @@ function searchCustomers(query) {
 }
 
 // Invoices
-function saveInvoice({ customer_email, stripe_invoice_id, amount, currency, description, status }) {
+function saveInvoice({ customer_email, stripe_invoice_id, paypal_invoice_id, square_invoice_id, amount, currency, description, status }) {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO invoices (customer_email, stripe_invoice_id, amount, currency, description, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [customer_email, stripe_invoice_id, amount, currency, description, status],
+      'INSERT INTO invoices (customer_email, stripe_invoice_id, paypal_invoice_id, square_invoice_id, amount, currency, description, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [customer_email, stripe_invoice_id, paypal_invoice_id, square_invoice_id, amount, currency, description, status],
       function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
@@ -207,6 +264,36 @@ function getInvoiceById(id) {
   });
 }
 
+function getUnpaidInvoices() {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM invoices WHERE status != "paid" AND status != "void"', [], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+function getInvoicesSummary() {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      let summary = {};
+      db.get('SELECT SUM(amount) as total FROM invoices', [], (err, row) => {
+        summary.total = row && row.total ? row.total : 0;
+        db.get('SELECT SUM(amount) as paid FROM invoices WHERE status = "paid"', [], (err2, row2) => {
+          summary.paid = row2 && row2.paid ? row2.paid : 0;
+          db.get('SELECT SUM(amount) as unpaid FROM invoices WHERE status = "sent"', [], (err3, row3) => {
+            summary.unpaid = row3 && row3.unpaid ? row3.unpaid : 0;
+            db.get('SELECT SUM(amount) as overdue FROM invoices WHERE status = "overdue"', [], (err4, row4) => {
+              summary.overdue = row4 && row4.overdue ? row4.overdue : 0;
+              resolve(summary);
+            });
+          });
+        });
+      });
+    });
+  });
+}
+
 function getRecentSalesReport(months = 6) {
   return new Promise((resolve, reject) => {
     db.all(
@@ -223,11 +310,18 @@ function getRecentSalesReport(months = 6) {
 
 module.exports = {
   db,
+  // User management
+  addUser,
+  getUser,
+  setUserRole,
+  getAllUsers,
+  // Admin compatibility
   getAdmins,
   addAdmin,
   removeAdmin,
   getAdminRole,
   setAdminRole,
+  // Customers & invoices
   getCustomersByTelegramId,
   getAllCustomers,
   getCustomerByEmail,
@@ -235,9 +329,12 @@ module.exports = {
   saveCustomer,
   updateCustomer,
   deleteCustomerByEmail,
+  deleteCustomer,
   searchCustomers,
   saveInvoice,
   getInvoicesByEmail,
   getInvoiceById,
+  getUnpaidInvoices,
+  getInvoicesSummary,
   getRecentSalesReport
 };

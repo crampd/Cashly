@@ -10,6 +10,7 @@ const invoice = require('./commands/invoice');
 const admins = require('./commands/admins');
 const help = require('./commands/help');
 const faq = require('./commands/faq');
+const setupCallCommand = require('./commands/call'); // <-- Add this line
 
 const bot = new Bot(config.BOT_TOKEN);
 bot.use(sessionMiddleware());
@@ -21,6 +22,9 @@ bot.command('faq', faq);
 bot.command('customers', requireRole(['admin', 'manager', 'staff']), customers);
 bot.command('invoice', requireRole(['admin', 'manager']), invoice);
 bot.command('admins', requireRole(['admin']), admins);
+
+// Register call command and its wizard
+setupCallCommand(bot); // <-- Add this line
 
 // Inline keyboard callback handlers
 bot.on('callback_query:data', async (ctx, next) => {
@@ -49,6 +53,7 @@ bot.on('message', async (ctx, next) => {
   if (ctx.session && ctx.session.adminAction) {
     return admins.handleMessage(ctx);
   }
+  // No need to handle call wizard here, it's handled in setupCallCommand
   await next();
 });
 

@@ -1,6 +1,10 @@
 const { createCustomer, createInvoice } = require('./stripe');
+const { createPayPalInvoice } = require('./paypal');
 const { saveCustomer, getCustomerByEmail, saveInvoice } = require('../db');
 
+/**
+ * Stripe invoice creation (unchanged)
+ */
 async function createAndSendInvoice({ telegram_id, name, email, description, amount }) {
   let customer = await getCustomerByEmail(email);
   let stripeCustomerId = (customer && customer.stripe_customer_id) ? customer.stripe_customer_id : null;
@@ -36,4 +40,41 @@ async function createAndSendInvoice({ telegram_id, name, email, description, amo
   return { url: invoiceUrl, status, amount: amount_due / 100 };
 }
 
-module.exports = { createAndSendInvoice };
+/**
+ * PayPal invoice creation and DB save
+ */
+async function createAndSendPayPalInvoice({ telegram_id, name, email, description, amount }) {
+  console.log('InvoiceManager: Calling createPayPalInvoice...');
+  const result = await createPayPalInvoice({
+    name,
+    email,
+    description,
+    amount
+  });
+  console.log('InvoiceManager: PayPal result:', result);
+
+  if (result && !result.error) {
+    await saveInvoice({
+      customer_email: email,
+      paypal_invoice_id: result.invoiceId,
+      amount: result.amount,
+      currency: 'USD',
+      description,
+      status: result.status
+    });
+    return {
+      url: result.invoiceUrl,
+      status: result.status,
+      amount: result.amount
+    };
+  } else {
+    // Always throw an error if result.error is set
+    console.error('InvoiceManager: PayPal error:', result && result.message);
+    throw new Error(result && result.message ? result.message : 'PayPal invoice creation failed');
+  }
+}
+
+module.exports = { 
+  createAndSendInvoice, 
+  createAndSendPayPalInvoice 
+};
