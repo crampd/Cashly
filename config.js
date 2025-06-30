@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 module.exports = {
   // Telegram Bot Configuration
   BOT_TOKEN: process.env.BOT_TOKEN,
