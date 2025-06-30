@@ -167,4 +167,4 @@ bot.catch((err) => {
 });
 
 bot.start();
-console.log('Bot started');
+console.log('========CashlyPay Bot started========');

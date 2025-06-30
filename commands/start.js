@@ -5,7 +5,7 @@ module.exports = async function startCommand(ctx) {
     .text('🧾 Invoice', '/invoice').row()
     .text('👥 Customers', '/customers').row()
     .text('❓ FAQ', 'open_faq').row()
-    .url('🌐 Visit Website', 'https://your-website.com');
+    .url('🌐 Visit Website', 'https://elevenlab.io');
   return ctx.reply(
     '👋 <b>Welcome to Cashly!</b>\n\n' +
     'Easily manage your customers and invoices right here.\n\n' +

@@ -68,5 +68,5 @@ function ask(index = 0) {
   });
 }
 
-console.log('--- Cashly .env Setup ---');
+console.log('-----✅ Cashly .env Setup -----');
 ask();

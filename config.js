@@ -16,6 +16,5 @@ module.exports = {
   SQUARE_ACCESS_TOKEN: process.env.SQUARE_ACCESS_TOKEN,
   SQUARE_LOCATION_ID: process.env.SQUARE_LOCATION_ID,
   WEBHOOK_PORT: process.env.WEBHOOK_PORT
-
-
+  // Add more configurations as needed
 };
