@@ -61,5 +61,5 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             cd ${{ secrets.EC2_PATH }}
             npm ci
-            pm2 restart bot || pm2 start bot.js --name bot
+            pm2 restart CashlyPay || pm2 start bot.js --name CashlyPay
           EOF
