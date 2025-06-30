@@ -38,14 +38,6 @@ out/
 .nuxt/
 .docusaurus
 
-# Voice API and vocalBank subdirectories (ignore their node_modules, env, etc.)
-voice/
-voice/package-lock.json
-vocalBank/node_modules/
-vocalBank/.env
-vocalBank/.env.*
-vocalBank/package-lock.json
-
 # Misc
 *.tgz
 *.tsbuildinfo

@@ -10,7 +10,6 @@
   },
   "scripts": {
     "start": "DEBUG=grammy* node bot.js",
-    "webhook": "node webhook/index.js",
     "setup": "node  scripts/setup-env"
   },
   "dependencies": {

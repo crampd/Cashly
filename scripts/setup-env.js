@@ -39,6 +39,14 @@ const questions = [
   {
     key: 'API_URL',
     question: 'Enter your API URL (optional): '
+  },
+  {
+    key: 'SQUARE_ACCESS_TOKEN',
+    question: 'Enter your Square Access Token:'
+  },
+  {
+    key: 'SQUARE_LOCATION_ID',
+    question: 'Enter your Square Location ID:'
   }
 ];
 

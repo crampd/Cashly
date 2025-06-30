@@ -15,13 +15,7 @@ module.exports = {
   // Square Configuration
   SQUARE_ACCESS_TOKEN: process.env.SQUARE_ACCESS_TOKEN,
   SQUARE_LOCATION_ID: process.env.SQUARE_LOCATION_ID,
+  WEBHOOK_PORT: process.env.WEBHOOK_PORT
 
-  // ElevenLabs Configuration
-  ELEVEN_LAB_API_KEY: process.env.ELEVEN_LAB_API_KEY,
-  ELEVEN_LAB_AGENT_ID: process.env.ELEVEN_LAB_AGENT_ID,
 
-  // Twilio Configuration
-  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
-  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
-  TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER
 };
