@@ -22,11 +22,13 @@ router.post('/paypal', bodyParser.json(), async (req, res) => {
     try {
       await saveInvoice({
         customer_email: invoice.primary_recipients?.[0]?.billing_info?.email_address || '',
-        stripe_invoice_id: invoice.id,
         amount: invoice.amount?.value || 0,
         currency: invoice.amount?.currency_code || '',
         description: invoice.note || '',
-        status: invoice.status
+        status: invoice.status,
+        platform: 'paypal',
+        transaction_id: invoice.id,
+        notified: true
       });
       console.log(`🔔 PayPal Invoice event: ${webhookEvent.event_type} for invoice ${invoice.id}`);
     } catch (err) {

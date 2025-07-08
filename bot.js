@@ -24,7 +24,7 @@ const setupCallCommand = require('./commands/call');
 const report = require('./commands/report');
 
 // PDF generator
-const { generateInvoicePDF } = require('./services/pdf');
+const { generateInvoicePDF } = require('./platforms/pdf');
 const { getInvoicesSummary, db } = require('./db');
 
 // --- Webhook Routers ---
@@ -61,7 +61,7 @@ setupCallCommand(bot);
 // Inline keyboard callback handlers
 bot.on('callback_query:data', async (ctx, next) => {
   try {
-    await ctx.answerCallbackQuery(); // Always answer, ignore if fails
+    await ctx.answerCallbackQuery();
   } catch (e) {}
 
   if (ctx.callbackQuery && ctx.callbackQuery.data) {
@@ -77,9 +77,8 @@ bot.on('callback_query:data', async (ctx, next) => {
     // --- Report PDF/CSV download handlers ---
     if (ctx.callbackQuery.data === 'download_report_pdf') {
       try {
-        // Generate a summary PDF
         const summary = await getInvoicesSummary();
-        const invoice = {
+        const invoiceObj = {
           id: 'Summary',
           customer_email: 'All',
           amount: summary.total,
@@ -87,7 +86,7 @@ bot.on('callback_query:data', async (ctx, next) => {
           description: 'Invoice Summary Report'
         };
         const filePath = path.join(__dirname, 'tmp', `report_${Date.now()}.pdf`);
-        await generateInvoicePDF(invoice, filePath);
+        await generateInvoicePDF(invoiceObj, filePath);
         await ctx.replyWithDocument(
           { source: fs.createReadStream(filePath), filename: 'invoice_report.pdf' },
           { caption: '📄 Invoice Summary Report (PDF)' }
@@ -101,14 +100,13 @@ bot.on('callback_query:data', async (ctx, next) => {
     }
     if (ctx.callbackQuery.data === 'download_report_csv') {
       try {
-        // Generate a CSV summary
         db.all('SELECT * FROM invoices', [], async (err, rows) => {
           if (err) {
             await ctx.reply('❌ Failed to generate CSV report.');
             return;
           }
           const csvRows = [
-            'ID,Customer Email,Amount,Currency,Description,Status,Created At',
+            'ID,Customer Email,Amount,Currency,Description,Status,Platform,Transaction ID,Notified,Created At',
             ...rows.map(r =>
               [
                 r.id,
@@ -117,14 +115,16 @@ bot.on('callback_query:data', async (ctx, next) => {
                 r.currency,
                 `"${(r.description || '').replace(/"/g, '""')}"`,
                 r.status,
+                r.platform,
+                r.transaction_id,
+                r.notified,
                 r.created_at
               ].join(',')
             )
           ];
-          const csvContent = csvRows.join('\n');
           const filePath = path.join(__dirname, 'tmp', `report_${Date.now()}.csv`);
           fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, csvContent);
+          fs.writeFileSync(filePath, csvRows.join('\n'));
           await ctx.replyWithDocument(
             { source: fs.createReadStream(filePath), filename: 'invoice_report.csv' },
             { caption: '📄 Invoice Report (CSV)' }
@@ -137,6 +137,10 @@ bot.on('callback_query:data', async (ctx, next) => {
       }
       return;
     }
+    // --- Multi-platform invoice platform selection ---
+    if (ctx.callbackQuery.data.startsWith('invoice:platform:')) {
+      return invoice.handleCallbackQuery(ctx);
+    }
   }
   await next();
 });
@@ -146,18 +150,17 @@ bot.on('message', async (ctx, next) => {
   if (ctx.session && ctx.session.customerAction) {
     return customers.handleMessage(ctx);
   }
-  if (ctx.session && ctx.session.invoiceAction) {
+  if (ctx.session && ctx.session.invoice && ctx.session.invoice.platform) {
     return invoice.handleMessage(ctx);
   }
   if (ctx.session && ctx.session.adminAction) {
     return admins.handleMessage(ctx);
   }
-  // No need to handle call wizard here, it's handled in setupCallCommand
   await next();
 });
 
 // Start reminders (pass bot instance to avoid circular dependency)
-const { setupReminders } = require('./services/reminder');
+const { setupReminders } = require('./platforms/reminder');
 setupReminders(bot);
 
 // Global error handler for grammY

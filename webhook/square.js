@@ -28,11 +28,13 @@ router.post('/square', bodyParser.json(), async (req, res) => {
     try {
       await saveInvoice({
         customer_email: invoice.primary_recipient?.customer_email || '',
-        stripe_invoice_id: invoice.id,
         amount: invoice.amount_money?.amount / 100 || 0,
         currency: invoice.amount_money?.currency || '',
         description: invoice.description || '',
-        status: invoice.status
+        status: invoice.status,
+        platform: 'square',
+        transaction_id: invoice.id,
+        notified: true
       });
       console.log(`🔔 Square Invoice event: ${event.type} for invoice ${invoice.id}`);
     } catch (err) {

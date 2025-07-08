@@ -1,7 +1,4 @@
 const { getAllCustomers, searchCustomers, saveCustomer, getCustomerByEmail, updateCustomer, deleteCustomerByEmail } = require('../db');
-const { createCustomer: createStripeCustomer } = require('../services/stripe');
-const { createPayPalCustomer } = require('../services/paypal');
-const { createSquareCustomer } = require('../services/square');
 const { InlineKeyboard } = require('grammy');
 const { writeFileSync, unlinkSync, existsSync, mkdirSync } = require('fs');
 const path = require('path');
@@ -137,15 +134,16 @@ module.exports.handleMessage = async function (ctx) {
       ctx.session.addData.address = text.toLowerCase() === 'skip' ? '' : text;
       try {
         let customerId = null;
+        // Use /platforms/ modules for customer creation
         if (service === 'stripe') {
-          const stripeCustomer = await createStripeCustomer(ctx.session.addData.name, ctx.session.addData.email);
-          customerId = stripeCustomer.id;
+          const stripe = require('../platforms/stripe');
+          customerId = await stripe.createCustomer(ctx.session.addData.name, ctx.session.addData.email);
         } else if (service === 'paypal') {
-          const paypalCustomer = await createPayPalCustomer(ctx.session.addData.name, ctx.session.addData.email);
-          customerId = paypalCustomer.id;
+          const paypal = require('../platforms/paypal');
+          customerId = await paypal.createCustomer(ctx.session.addData.name, ctx.session.addData.email);
         } else if (service === 'square') {
-          const squareCustomer = await createSquareCustomer(ctx.session.addData.name, ctx.session.addData.email);
-          customerId = squareCustomer.id;
+          const square = require('../platforms/square');
+          customerId = await square.createCustomer(ctx.session.addData.name, ctx.session.addData.email);
         } else {
           throw new Error('Unknown service');
         }

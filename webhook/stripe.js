@@ -23,11 +23,13 @@ router.post('/stripe', bodyParser.raw({ type: 'application/json' }), async (req,
     try {
       await saveInvoice({
         customer_email: invoice.customer_email || '',
-        stripe_invoice_id: invoice.id,
         amount: invoice.amount_due / 100,
         currency: invoice.currency,
         description: invoice.description || '',
-        status: invoice.status
+        status: invoice.status,
+        platform: 'stripe',
+        transaction_id: invoice.id,
+        notified: true
       });
       console.log(`🔔 Invoice event: ${event.type} for invoice ${invoice.id}`);
     } catch (err) {

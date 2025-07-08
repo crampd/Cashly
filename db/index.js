@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('./db/cashly.db');
 const config = require('../config');
 
-// Initialize tables
+// Initialize tables and add new columns if missing
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -38,16 +38,21 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS invoices (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       customer_email TEXT,
-      stripe_invoice_id TEXT,
-      paypal_invoice_id TEXT,
-      square_invoice_id TEXT,
       amount REAL,
       currency TEXT,
       description TEXT,
       status TEXT,
+      platform TEXT,
+      transaction_id TEXT,
+      notified BOOLEAN DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Add new columns if they don't exist (safe to run every time)
+  db.run(`ALTER TABLE invoices ADD COLUMN platform TEXT`, [], () => {});
+  db.run(`ALTER TABLE invoices ADD COLUMN transaction_id TEXT`, [], () => {});
+  db.run(`ALTER TABLE invoices ADD COLUMN notified BOOLEAN DEFAULT 0`, [], () => {});
 });
 
 // --- User Management ---
@@ -233,11 +238,21 @@ function searchCustomers(query) {
 }
 
 // Invoices
-function saveInvoice({ customer_email, stripe_invoice_id, paypal_invoice_id, square_invoice_id, amount, currency, description, status }) {
+function saveInvoice({ customer_email, amount, currency, description, status, platform, transaction_id, notified }) {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT INTO invoices (customer_email, stripe_invoice_id, paypal_invoice_id, square_invoice_id, amount, currency, description, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [customer_email, stripe_invoice_id, paypal_invoice_id, square_invoice_id, amount, currency, description, status],
+      `INSERT INTO invoices (customer_email, amount, currency, description, status, platform, transaction_id, notified, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [
+        customer_email,
+        amount,
+        currency,
+        description,
+        status,
+        platform,
+        transaction_id,
+        notified ? 1 : 0
+      ],
       function (err) {
         if (err) reject(err);
         else resolve(this.lastID);

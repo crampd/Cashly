@@ -1,10 +1,10 @@
 const { getAllCustomers, getInvoicesByEmail, getInvoiceById } = require('../db');
-const { createAndSendInvoice, createAndSendPayPalInvoice } = require('../services/invoiceManager');
-const { createSquareInvoice } = require('../services/square');
-const { getPayPalInvoice } = require('../services/paypal');
-const { getStripeInvoice } = require('../services/stripe');
-const { getSquareInvoice } = require('../services/square');
-const { generateInvoicePDF } = require('../services/pdf');
+const { createAndSendInvoice, createAndSendPayPalInvoice } = require('../platforms/invoiceManager');
+const { createSquareInvoice } = require('../platforms/square');
+const { getPayPalInvoice } = require('../platforms/paypal');
+const { getStripeInvoice } = require('../platforms/stripe');
+const { getSquareInvoice } = require('../platforms/square');
+const { generateInvoicePDF } = require('../platforms/pdf');
 const { InlineKeyboard } = require('grammy');
 const path = require('path');
 
